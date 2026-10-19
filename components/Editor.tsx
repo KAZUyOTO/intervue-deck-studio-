@@ -633,6 +633,28 @@ export default function Editor() {
                 {websiteLogoStatus?.msg}
               </p>
             </form>
+            <label
+              className={`dropzone ${uploading ? 'is-busy' : ''}`}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={async (e) => {
+                e.preventDefault();
+                setDragging(false);
+                if (e.dataTransfer.getData(LOGO_MIME)) return;
+                await uploadFiles([...e.dataTransfer.files]);
+              }}
+            >
+              <input
+                type="file"
+                accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                multiple
+                onChange={async (e) => {
+                  const files = [...(e.target.files || [])];
+                  e.target.value = '';
+                  await uploadFiles(files);
+                }}
+              />
+              {uploading ? `Uploading ${uploading}…` : 'Or upload logos — PNG or SVG, drop here or click'}
+            </label>
             {!data.storage.ok && <p className="hint error">{data.storage.reason}</p>}
             {logos.length > 6 && <input className="search" placeholder="Search logos" value={logoQuery} onChange={(e) => setLogoQuery(e.target.value)} />}
             <div className="library">
