@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { exists, fileUrl, listFiles, putFile, storageReady } from '@/lib/storage';
 import type { LogoAsset } from '@/lib/types';
+import { findWebsiteLogo } from '@/lib/website-logo';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 const TYPES: Record<string, string> = {
   'image/png': 'png',
@@ -42,6 +44,21 @@ export async function POST(req: Request) {
   const ready = storageReady();
   if (!ready.ok) return NextResponse.json({ error: ready.reason }, { status: 503 });
 
+  if (req.headers.get('content-type')?.includes('application/json')) {
+    try {
+      const input = await req.json();
+      if (typeof input?.url !== 'string' || !input.url.trim() || input.url.length > 2048) {
+        return NextResponse.json({ error: 'Enter a company website.' }, { status: 400 });
+      }
+      const found = await findWebsiteLogo(input.url);
+      const result = await saveLogo(new File([new Uint8Array(found.body)], found.name, { type: found.type }), found.name);
+      return NextResponse.json({ ...result, source: found.source });
+    } catch (error) {
+      console.warn('[logos] Website import failed:', error instanceof Error ? error.message : 'Unknown error');
+      return NextResponse.json({ error: 'Could not find a usable logo. Use a public company homepage, or upload a PNG or SVG instead.' }, { status: 422 });
+    }
+  }
+
   const form = await req.formData();
   const file = form.get('file');
   if (!(file instanceof File)) return NextResponse.json({ error: 'No file.' }, { status: 400 });
@@ -49,10 +66,15 @@ export async function POST(req: Request) {
   if (!ext) return NextResponse.json({ error: 'Use a PNG, SVG, JPG or WebP logo.' }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: 'Logo must be under 4 MB.' }, { status: 400 });
 
+  return NextResponse.json(await saveLogo(file, String(form.get('name') || file.name)));
+}
+
+async function saveLogo(file: File, name: string) {
+  const ext = TYPES[file.type] || 'svg';
   let body: Buffer = Buffer.from(await file.arrayBuffer());
   if (ext === 'svg') body = Buffer.from(sanitizeSvg(body.toString('utf8')));
 
-  const rawName = String(form.get('name') || file.name).replace(/\.[a-z0-9]+$/i, '');
+  const rawName = name.replace(/\.[a-z0-9]+$/i, '');
   const slug =
     rawName
       .toLowerCase()
@@ -62,13 +84,13 @@ export async function POST(req: Request) {
   const hash = createHash('sha1').update(body).digest('hex').slice(0, 10);
 
   // Same file uploaded twice → reuse the existing library entry.
-  const existing = (await listFiles(`logos/${hash}--`))[0];
+  const existing = (await listFiles('logos/')).find((item) => item.pathname.startsWith(`logos/${hash}--`));
   if (existing) {
-    return NextResponse.json({ logo: toAsset(existing.pathname, existing.size, existing.uploadedAt), duplicate: true });
+    return { logo: toAsset(existing.pathname, existing.size, existing.uploadedAt), duplicate: true };
   }
   const pathname = `logos/${hash}--${slug}.${ext}`;
   if (!(await exists(pathname))) {
     await putFile(pathname, body, ext === 'svg' ? 'image/svg+xml' : file.type);
   }
-  return NextResponse.json({ logo: toAsset(pathname, body.length, new Date().toISOString()) });
+  return { logo: toAsset(pathname, body.length, new Date().toISOString()) };
 }

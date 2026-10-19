@@ -83,6 +83,9 @@ export default function Editor() {
   const [logos, setLogos] = useState<LogoAsset[]>([]);
   const [logoQuery, setLogoQuery] = useState('');
   const [uploading, setUploading] = useState(0);
+  const [companyUrl, setCompanyUrl] = useState('');
+  const [findingLogo, setFindingLogo] = useState(false);
+  const [websiteLogoStatus, setWebsiteLogoStatus] = useState<{ msg: string; error?: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [dropSlot, setDropSlot] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; tone?: 'error' } | null>(null);
@@ -276,6 +279,31 @@ export default function Editor() {
     },
     [showToast],
   );
+
+  const importWebsiteLogo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (findingLogo || !companyUrl.trim()) return;
+    setFindingLogo(true);
+    setWebsiteLogoStatus(null);
+    try {
+      const res = await fetch('/api/logos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: companyUrl.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Logo lookup failed. Try uploading it instead.');
+      setLogos((cur) => [json.logo, ...cur.filter((l) => l.pathname !== json.logo.pathname)]);
+      setLogoQuery('');
+      setWebsiteLogoStatus({
+        msg: `${json.source}${json.duplicate ? ' already in' : ' added to'} the library. Click or drag it onto a logo box.`,
+      });
+    } catch (error) {
+      setWebsiteLogoStatus({ msg: error instanceof Error ? error.message : 'Logo lookup failed. Try uploading it instead.', error: true });
+    } finally {
+      setFindingLogo(false);
+    }
+  };
 
   const handleDrop = async (e: React.DragEvent, key: string) => {
     e.preventDefault();
@@ -575,6 +603,66 @@ export default function Editor() {
             </div>
           )}
 
+          <div className="group" id="library">
+            <h3>
+              Logo library <span className="count">{logos.length}</span>
+            </h3>
+            {selectedSlotKey && <p className="hint strong">Click a logo to use it as the {slotLabel(selectedSlotKey).toLowerCase()}.</p>}
+            <form className="website-logo" onSubmit={importWebsiteLogo} aria-busy={findingLogo}>
+              <label className="field" htmlFor="company-website">
+                <span>Company website</span>
+                <input
+                  id="company-website"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="url"
+                  placeholder="e.g. intervue.io"
+                  value={companyUrl}
+                  maxLength={2048}
+                  required
+                  disabled={findingLogo}
+                  aria-describedby="company-website-hint company-website-status"
+                  onChange={(e) => { setCompanyUrl(e.target.value); setWebsiteLogoStatus(null); }}
+                />
+              </label>
+              <p className="note" id="company-website-hint">Find a logo from the company’s website and save it to the library.</p>
+              <button className="btn" type="submit" disabled={findingLogo || !companyUrl.trim() || !data.storage.ok}>
+                {findingLogo ? 'Finding logo…' : 'Find logo'}
+              </button>
+              <p id="company-website-status" className={`note${websiteLogoStatus?.error ? ' error' : ''}`} role="status" aria-live="polite">
+                {websiteLogoStatus?.msg}
+              </p>
+            </form>
+            {!data.storage.ok && <p className="hint error">{data.storage.reason}</p>}
+            {logos.length > 6 && <input className="search" placeholder="Search logos" value={logoQuery} onChange={(e) => setLogoQuery(e.target.value)} />}
+            <div className="library">
+              {filteredLogos.map((l) => (
+                <button
+                  key={l.pathname}
+                  className={`logo-tile ${Object.values(values.logos).some((v) => v.url === l.url) ? 'in-use' : ''}`}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(LOGO_MIME, JSON.stringify({ url: l.url, name: l.name }));
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  onClick={() => {
+                    const key = selectedSlotKey || (slotKeys.length === 1 ? slotKeys[0][0] : undefined);
+                    if (key) assignLogo(key, { url: l.url, name: l.name });
+                    else showToast('Drag the logo onto the box where it should go');
+                  }}
+                  title={l.name}
+                >
+                  <span className="logo-img">
+                    <img src={l.url} alt="" loading="lazy" draggable={false} />
+                  </span>
+                  <span className="logo-name">{l.name}</span>
+                </button>
+              ))}
+              {logos.length === 0 && <p className="hint">Every logo anyone uploads is saved here for the whole team.</p>}
+              {logos.length > 0 && filteredLogos.length === 0 && <p className="hint">No logos match “{logoQuery}”.</p>}
+            </div>
+          </div>
+
           <div className="group">
             <h3>Text on this slide</h3>
             {editableTexts.length === 0 && <p className="hint">Nothing editable on this slide.</p>}
@@ -612,62 +700,7 @@ export default function Editor() {
             })}
           </div>
 
-          <div className="group" id="library">
-            <h3>
-              Logo library <span className="count">{logos.length}</span>
-            </h3>
-            {selectedSlotKey && <p className="hint strong">Click a logo to use it as the {slotLabel(selectedSlotKey).toLowerCase()}.</p>}
-            <label
-              className={`dropzone ${uploading ? 'is-busy' : ''}`}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={async (e) => {
-                e.preventDefault();
-                setDragging(false);
-                if (e.dataTransfer.getData(LOGO_MIME)) return;
-                await uploadFiles([...e.dataTransfer.files]);
-              }}
-            >
-              <input
-                type="file"
-                accept="image/png,image/svg+xml,image/jpeg,image/webp"
-                multiple
-                onChange={async (e) => {
-                  const files = [...(e.target.files || [])];
-                  e.target.value = '';
-                  await uploadFiles(files);
-                }}
-              />
-              {uploading ? `Uploading ${uploading}…` : 'Upload logos — PNG or SVG, drop here or click'}
-            </label>
-            {!data.storage.ok && <p className="hint error">{data.storage.reason}</p>}
-            {logos.length > 6 && <input className="search" placeholder="Search logos" value={logoQuery} onChange={(e) => setLogoQuery(e.target.value)} />}
-            <div className="library">
-              {filteredLogos.map((l) => (
-                <button
-                  key={l.pathname}
-                  className={`logo-tile ${Object.values(values.logos).some((v) => v.url === l.url) ? 'in-use' : ''}`}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(LOGO_MIME, JSON.stringify({ url: l.url, name: l.name }));
-                    e.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onClick={() => {
-                    const key = selectedSlotKey || (slotKeys.length === 1 ? slotKeys[0][0] : undefined);
-                    if (key) assignLogo(key, { url: l.url, name: l.name });
-                    else showToast('Drag the logo onto the box where it should go');
-                  }}
-                  title={l.name}
-                >
-                  <span className="logo-img">
-                    <img src={l.url} alt="" loading="lazy" draggable={false} />
-                  </span>
-                  <span className="logo-name">{l.name}</span>
-                </button>
-              ))}
-              {logos.length === 0 && <p className="hint">Every logo anyone uploads is saved here for the whole team.</p>}
-              {logos.length > 0 && filteredLogos.length === 0 && <p className="hint">No logos match “{logoQuery}”.</p>}
-            </div>
-          </div>
+
         </aside>
       </div>
 
