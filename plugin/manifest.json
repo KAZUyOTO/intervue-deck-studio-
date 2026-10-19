@@ -1,0 +1,13 @@
+{
+  "name": "Deck Studio – Publish",
+  "id": "deck-studio-publish-intervue",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma", "slides"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["__SITE__"],
+    "reasoning": "Uploads the exported slides to your Deck Studio site."
+  }
+}

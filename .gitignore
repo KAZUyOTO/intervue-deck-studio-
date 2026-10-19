@@ -1,0 +1,10 @@
+node_modules
+.next
+.data
+.env*.local
+.vercel
+next-env.d.ts
+*.tsbuildinfo
+public/demo
+lib/demo-manifest.json
+public/deck-studio-plugin.zip

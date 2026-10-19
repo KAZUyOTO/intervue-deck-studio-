@@ -1,0 +1,12 @@
+/*
+  Add the deck's fonts here so edited text matches Figma.
+  Put the font files next to this file and declare one @font-face per weight, e.g.
+
+  @font-face {
+    font-family: "Inter";          / * must match the font name in Figma exactly * /
+    src: url("./Inter-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+*/

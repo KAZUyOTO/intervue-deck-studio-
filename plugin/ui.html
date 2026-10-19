@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font: 12px/1.45 Inter, system-ui, -apple-system, sans-serif; color: var(--figma-color-text, #222); background: var(--figma-color-bg, #fff); }
+  main { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  h1 { font-size: 14px; margin: 0; font-weight: 600; }
+  p { margin: 0; color: var(--figma-color-text-secondary, #666); }
+  label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+  input { font: inherit; padding: 7px 8px; border-radius: 6px; border: 1px solid var(--figma-color-border, #ddd); background: var(--figma-color-bg, #fff); color: inherit; }
+  input:focus { outline: none; border-color: var(--figma-color-border-brand-strong, #0d99ff); }
+  button { font: inherit; font-weight: 600; padding: 9px 12px; border-radius: 6px; border: 0; cursor: pointer; background: var(--figma-color-bg-brand, #0d99ff); color: var(--figma-color-text-onbrand, #fff); }
+  button:disabled { opacity: .55; cursor: default; }
+  .ghost { background: transparent; color: inherit; border: 1px solid var(--figma-color-border, #ddd); }
+  .bar { height: 6px; border-radius: 99px; background: var(--figma-color-bg-secondary, #eee); overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: var(--figma-color-bg-brand, #0d99ff); transition: width .2s; }
+  .status { min-height: 18px; }
+  .error { color: var(--figma-color-text-danger, #d22); }
+  .ok { color: var(--figma-color-text-success, #198f51); }
+  .row { display: flex; gap: 8px; }
+  .row button { flex: 1; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Publish to Deck Studio</h1>
+    <p id="count">Reading slides…</p>
+  </div>
+  <label>Deck name <input id="name" list="existing" autocomplete="off" /></label>
+  <datalist id="existing"></datalist>
+  <p id="mode"></p>
+  <label>Deck Studio link <input id="site" placeholder="https://…" /></label>
+  <label>Designer passcode <input id="passcode" type="password" /></label>
+  <button id="go" disabled>Publish</button>
+  <div class="bar"><div id="bar"></div></div>
+  <div id="status" class="status"></div>
+  <div class="row" id="after" hidden>
+    <button class="ghost" id="open">Open Deck Studio</button>
+    <button class="ghost" id="close">Close</button>
+  </div>
+</main>
+<script>
+  var DEFAULT_SITE = '__SITE__';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { slides: [], publishId: '', slug: '', uploaded: 0, totalFiles: 0, total: 0 };
+
+  function slugify(s) {
+    return (s || 'deck').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'deck';
+  }
+  function site() { return ($('site').value || DEFAULT_SITE).replace(/\/+$/, ''); }
+  function setStatus(text, cls) { $('status').textContent = text; $('status').className = 'status ' + (cls || ''); }
+  function progress(f) { $('bar').style.width = Math.round(f * 100) + '%'; }
+
+  async function upload(file) {
+    var url = site() + '/api/publish/upload?deck=' + encodeURIComponent(state.slug) + '&id=' + encodeURIComponent(state.publishId) + '&name=' + encodeURIComponent(file.name);
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        var res = await fetch(url, { method: 'POST', headers: { 'content-type': file.mime, 'x-admin-key': $('passcode').value }, body: file.bytes });
+        var json = await res.json().catch(function () { return {}; });
+        if (res.status === 401) throw Object.assign(new Error('Wrong passcode.'), { fatal: true });
+        if (!res.ok) throw new Error(json.error || ('Upload failed (' + res.status + ')'));
+        return json.path;
+      } catch (e) {
+        if (e.fatal || attempt === 2) throw e;
+        await new Promise(function (r) { setTimeout(r, 800 * (attempt + 1)); });
+      }
+    }
+  }
+
+  async function handleSlide(msg) {
+    var s = msg.slide;
+    s.pieces = {};
+    var queue = msg.files.slice();
+    async function worker() {
+      while (queue.length) {
+        var f = queue.shift();
+        var path = await upload(f);
+        if (f.bg) s.bg = path;
+        else if (f.thumb) s.thumb = path;
+        else s.pieces[f.piece] = path;
+        state.uploaded++;
+        progress((msg.index + state.uploaded / Math.max(1, msg.files.length)) / msg.total * 0.95);
+      }
+    }
+    state.uploaded = 0;
+    setStatus('Uploading slide ' + (msg.index + 1) + ' of ' + msg.total + '…');
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    state.slides[msg.index] = s;
+  }
+
+  async function commit() {
+    setStatus('Saving deck…');
+    var res = await fetch(site() + '/api/publish/commit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-admin-key': $('passcode').value },
+      body: JSON.stringify({ slug: state.slug, name: $('name').value.trim() || 'Deck', publishId: state.publishId, slides: state.slides }),
+    });
+    var json = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(json.error || ('Saving failed (' + res.status + ')'));
+    progress(1);
+    setStatus('Published ' + state.slides.length + ' slides. Sales see it the next time they open the link.', 'ok');
+    $('after').hidden = false;
+    parent.postMessage({ pluginMessage: { type: 'done' } }, '*');
+  }
+
+  function fail(e) {
+    setStatus((e && e.message) || String(e), 'error');
+    $('go').disabled = false;
+  }
+
+  $('go').onclick = function () {
+    if (!$('passcode').value) return setStatus('Enter the designer passcode.', 'error');
+    $('go').disabled = true;
+    $('after').hidden = true;
+    state.slides = [];
+    state.slug = slugify($('name').value);
+    state.publishId = new Date().toISOString().replace(/[:.]/g, '-');
+    progress(0);
+    setStatus('Exporting slides…');
+    parent.postMessage({ pluginMessage: { type: 'remember', site: $('site').value, passcode: $('passcode').value } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'publish' } }, '*');
+  };
+  // Existing decks in the library, so the designer can update one instead of adding a copy.
+  var existing = [];
+  function showMode() {
+    var slug = slugify($('name').value);
+    var match = existing.filter(function (d) { return d.slug === slug; })[0];
+    $('mode').textContent = match ? 'Updates “' + match.name + '” in the deck library.' : 'Adds a new deck to the library.';
+  }
+  async function loadExisting() {
+    try {
+      var res = await fetch(site() + '/api/publish/decks');
+      var json = await res.json();
+      existing = json.decks || [];
+      $('existing').innerHTML = existing.map(function (d) { return '<option value="' + d.name.replace(/"/g, '&quot;') + '"></option>'; }).join('');
+    } catch (e) { existing = []; }
+    showMode();
+  }
+  $('name').oninput = showMode;
+  $('site').onchange = loadExisting;
+
+  $('open').onclick = function () { window.open(site(), '_blank'); };
+  $('close').onclick = function () { parent.postMessage({ pluginMessage: { type: 'close' } }, '*'); };
+
+  onmessage = async function (e) {
+    var msg = e.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === 'init') {
+      $('name').value = msg.name;
+      $('site').value = msg.site || DEFAULT_SITE;
+      $('passcode').value = msg.passcode || '';
+      $('count').textContent = msg.count + (msg.count === 1 ? ' slide' : ' slides') + ' will be published. Re-publishing with the same name replaces that deck.';
+      $('go').disabled = msg.count === 0;
+      loadExisting();
+    }
+    if (msg.type === 'slide') {
+      try {
+        await handleSlide(msg);
+        parent.postMessage({ pluginMessage: { type: 'ack', ack: msg.ack } }, '*');
+      } catch (err) {
+        parent.postMessage({ pluginMessage: { type: 'ack', ack: msg.ack, error: err.message } }, '*');
+      }
+    }
+    if (msg.type === 'exported') {
+      try { await commit(); } catch (err) { fail(err); }
+    }
+    if (msg.type === 'error') fail(msg);
+  };
+  parent.postMessage({ pluginMessage: { type: 'init' } }, '*');
+</script>
+</body>
+</html>
