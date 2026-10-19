@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { exists, fileUrl, listFiles, putFile, storageReady } from '@/lib/storage';
+import { deleteFile, exists, fileUrl, listFiles, putFile, storageReady } from '@/lib/storage';
 import type { LogoAsset } from '@/lib/types';
 import { findWebsiteLogo } from '@/lib/website-logo';
 
@@ -29,6 +29,16 @@ export async function GET() {
     .map((f) => toAsset(f.pathname, f.size, f.uploadedAt))
     .sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1));
   return NextResponse.json({ logos, storage: storageReady() });
+}
+
+/** Removes a logo from the shared library. Decks already exported keep it; drafts using it fall back to the empty spot. */
+export async function DELETE(req: Request) {
+  const pathname = new URL(req.url).searchParams.get('path') || '';
+  if (!/^logos\/[a-f0-9]{10}--[a-z0-9-]+\.(png|jpg|webp|svg)$/.test(pathname)) {
+    return NextResponse.json({ error: 'Unknown logo.' }, { status: 400 });
+  }
+  await deleteFile(pathname);
+  return NextResponse.json({ ok: true });
 }
 
 function sanitizeSvg(svg: string) {

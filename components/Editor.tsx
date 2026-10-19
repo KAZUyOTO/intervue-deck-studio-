@@ -280,6 +280,21 @@ export default function Editor() {
     [showToast],
   );
 
+  const deleteLogo = async (l: LogoAsset) => {
+    if (!window.confirm(`Delete “${l.name}” from the logo library for everyone?`)) return;
+    try {
+      const res = await fetch(`/api/logos?path=${encodeURIComponent(l.pathname)}`, { method: 'DELETE' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Could not delete the logo.');
+      setLogos((cur) => cur.filter((x) => x.pathname !== l.pathname));
+      // take it off this deck too, so it doesn't end up in a PDF from a deleted file
+      setValues((s) => ({ ...s, logos: Object.fromEntries(Object.entries(s.logos).filter(([, v]) => v.url !== l.url)) }));
+      showToast(`Deleted “${l.name}”`);
+    } catch (e: any) {
+      showToast(e.message || 'Could not delete the logo.', 'error');
+    }
+  };
+
   const importWebsiteLogo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (findingLogo || !companyUrl.trim()) return;
@@ -659,8 +674,8 @@ export default function Editor() {
             {logos.length > 6 && <input className="search" placeholder="Search logos" value={logoQuery} onChange={(e) => setLogoQuery(e.target.value)} />}
             <div className="library">
               {filteredLogos.map((l) => (
+                <div key={l.pathname} className="logo-tile-wrap">
                 <button
-                  key={l.pathname}
                   className={`logo-tile ${Object.values(values.logos).some((v) => v.url === l.url) ? 'in-use' : ''}`}
                   draggable
                   onDragStart={(e) => {
@@ -679,6 +694,10 @@ export default function Editor() {
                   </span>
                   <span className="logo-name">{l.name}</span>
                 </button>
+                <button type="button" className="logo-delete" onClick={() => deleteLogo(l)} title={`Delete ${l.name}`} aria-label={`Delete ${l.name} from the library`}>
+                  ×
+                </button>
+                </div>
               ))}
               {logos.length === 0 && <p className="hint">Every logo anyone uploads is saved here for the whole team.</p>}
               {logos.length > 0 && filteredLogos.length === 0 && <p className="hint">No logos match “{logoQuery}”.</p>}

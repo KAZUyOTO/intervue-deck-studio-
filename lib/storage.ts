@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { put, list as blobList, head } from '@vercel/blob';
+import { put, list as blobList, head, del } from '@vercel/blob';
 
 /**
  * One tiny storage API with two backends:
@@ -60,6 +60,15 @@ export async function exists(pathname: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Deletes a stored file (no error if it's already gone). */
+export async function deleteFile(pathname: string): Promise<void> {
+  if (useBlob()) {
+    await del(pathname);
+    return;
+  }
+  await fs.rm(safeLocal(pathname), { force: true });
 }
 
 /** Public URL of a stored file in Blob storage (null when running on local files). */

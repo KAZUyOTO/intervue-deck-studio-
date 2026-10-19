@@ -149,6 +149,16 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: rg
 .logo-tile.in-use { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .logo-img { height: 46px; display: grid; place-items: center; border-radius: 5px; background: repeating-conic-gradient(#f2f1ec 0% 25%, #fff 0% 50%) 50% / 10px 10px; }
 .logo-img img { max-width: 88%; max-height: 80%; object-fit: contain; }
+.logo-tile-wrap { position: relative; min-width: 0; display: flex; }
+.logo-tile-wrap .logo-tile { flex: 1; }
+.logo-delete {
+  position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; padding: 0; border-radius: 999px;
+  border: 1px solid var(--line-2); background: #fff; color: var(--ink-2); font-size: 14px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center; opacity: 0; transition: opacity .12s, color .12s, border-color .12s;
+}
+.logo-tile-wrap:hover .logo-delete, .logo-delete:focus-visible { opacity: 1; }
+.logo-delete:hover { color: var(--danger); border-color: var(--danger); }
+@media (hover: none) { .logo-delete { opacity: 1; } }
 .logo-name { font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
 
 .website-logo { margin: 12px 0; }
