@@ -10,6 +10,7 @@ export const OPTIONS = preflight;
 const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const str = (v: unknown, d = '') => (typeof v === 'string' ? v.slice(0, 5000) : d);
 const box = (b: any): Box => ({ x: num(b?.x), y: num(b?.y), w: num(b?.w), h: num(b?.h) });
+const optBox = (b: any): Box | undefined => (b && num(b.w) > 0 && num(b.h) > 0 ? box(b) : undefined);
 
 /** Saves the deck the Figma plugin just uploaded. Re-publishing a deck name replaces it. */
 export async function POST(req: Request) {
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
       name: str(t.name, 'Text'),
       characters: str(t.characters),
       box: box(t.box),
+      pieceBox: optBox(t.pieceBox),
       style: {
         fontFamily: str(t.style?.fontFamily, 'Inter'),
         fontWeight: num(t.style?.fontWeight, 400),
@@ -65,6 +67,7 @@ export async function POST(req: Request) {
       name: str(l.name),
       key: str(l.key, 'client'),
       box: box(l.box),
+      pieceBox: optBox(l.pieceBox),
       alpha: num(l.alpha, 1),
     })).filter((l: LogoSlot) => onSlide(l.box, width, height));
     return {

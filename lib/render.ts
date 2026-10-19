@@ -366,7 +366,8 @@ function textOffset(t: TextLayer, piece: CanvasImageSource & { width: number; he
         theirs.width = W;
         theirs.height = H;
         const tctx = theirs.getContext('2d', { willReadFrequently: true })!;
-        tctx.drawImage(piece, pad * RES, pad * RES, t.box.w * RES, t.box.h * RES);
+        const pb = t.pieceBox ?? t.box;
+        tctx.drawImage(piece, (pad + pb.x - t.box.x) * RES, (pad + pb.y - t.box.y) * RES, pb.w * RES, pb.h * RES);
         const b = inkBox(tctx, W, H);
         if (!a || !b) return zero;
         // only trust it when both renderings have the same footprint (same font, same wording)
@@ -459,7 +460,10 @@ async function renderPublished(canvas: HTMLCanvasElement, slide: Slide, v: DeckV
     if (v.logos[s.key]) {
       const { size, align } = logoFor(v, s.key);
       fitLogo(ctx, img, s.box, size, align);
-    } else ctx.drawImage(img, s.box.x, s.box.y, s.box.w, s.box.h);
+    } else {
+      const pb = s.pieceBox ?? s.box;
+      ctx.drawImage(img, pb.x, pb.y, pb.w, pb.h);
+    }
     ctx.globalAlpha = 1;
   });
 
@@ -479,7 +483,8 @@ async function renderPublished(canvas: HTMLCanvasElement, slide: Slide, v: DeckV
       return;
     }
     ctx.globalAlpha = t.alpha ?? 1;
-    ctx.drawImage(img, t.box.x, t.box.y, t.box.w, t.box.h);
+    const pb = t.pieceBox ?? t.box; // older decks only have the text box
+    ctx.drawImage(img, pb.x, pb.y, pb.w, pb.h);
     ctx.globalAlpha = 1;
   });
 }

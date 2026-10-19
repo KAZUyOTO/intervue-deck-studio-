@@ -113,6 +113,13 @@ function relBox(node, origin) {
   return { x: b.x - origin.x, y: b.y - origin.y, w: b.width, h: b.height };
 }
 
+/** Everything the layer paints (letters can reach outside the text box), relative to the slide. */
+function paintBox(node, origin) {
+  var b = node.absoluteRenderBounds;
+  if (!b || !(b.width > 0) || !(b.height > 0)) return relBox(node, origin);
+  return { x: b.x - origin.x, y: b.y - origin.y, w: b.width, h: b.height };
+}
+
 /** At least half of the layer is on the slide (skips text parked off-canvas or scrolled out of view). */
 function onSlide(box, slide) {
   var w = slide.absoluteBoundingBox.width, h = slide.absoluteBoundingBox.height;
@@ -141,7 +148,7 @@ function collect(slide) {
     if (!n.visible) return;
     var name = (n.name || '').trim();
     if (SLOT.test(name) && n.absoluteBoundingBox && onSlide(relBox(n, origin), slide) && !croppedByFrame(n, slide)) {
-      slots.push({ id: n.id, name: name, key: slotKey(name), box: relBox(n, origin), alpha: opacityChain(n.parent, slide) });
+      slots.push({ id: n.id, name: name, key: slotKey(name), box: relBox(n, origin), pieceBox: paintBox(n, origin), alpha: opacityChain(n.parent, slide) });
       nodes[n.id] = n;
       return;
     }
@@ -157,6 +164,7 @@ function collect(slide) {
         name: name || 'Text',
         characters: chars,
         box: relBox(n, origin),
+        pieceBox: paintBox(n, origin),
         style: s.style,
         editable: true,
         mixed: s.mixed,
@@ -207,9 +215,10 @@ async function publish() {
     var files = [];
 
     // 1. Each editable layer on its own (transparent PNG), so unedited ones look exactly like Figma.
+    //    Exported with everything it paints, not cropped to its box, so no letter gets cut off.
     for (var j = 0; j < ids.length; j++) {
       var node = c.nodes[ids[j]];
-      var png = await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 }, useAbsoluteBounds: true });
+      var png = await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
       files.push({ name: 'p-' + fileId(ids[j]) + '.png', mime: 'image/png', bytes: png, piece: ids[j] });
     }
 

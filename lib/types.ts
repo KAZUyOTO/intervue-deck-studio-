@@ -30,6 +30,8 @@ export type TextLayer = {
   firstBaseline?: number;
   /** Opacity of the groups around the layer (published decks draw the layer image with it). */
   alpha?: number;
+  /** Where the layer's image goes: everything it paints, which can reach outside its box (descenders, overhangs). */
+  pieceBox?: Box;
 };
 
 export type LogoSlot = {
@@ -39,6 +41,7 @@ export type LogoSlot = {
   key: string;
   box: Box;
   alpha?: number;
+  pieceBox?: Box;
 };
 
 export type Slide = {
