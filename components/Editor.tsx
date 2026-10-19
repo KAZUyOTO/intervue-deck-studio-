@@ -640,7 +640,7 @@ export default function Editor() {
                   onChange={(e) => { setCompanyUrl(e.target.value); setWebsiteLogoStatus(null); }}
                 />
               </label>
-              <p className="note" id="company-website-hint">Find a logo from the company’s website and save it to the library.</p>
+              <p className="note" id="company-website-hint">Find a logo from the company’s website. If access is blocked, try Google’s cached site icon.</p>
               <button className="btn" type="submit" disabled={findingLogo || !companyUrl.trim() || !data.storage.ok}>
                 {findingLogo ? 'Finding logo…' : 'Find logo'}
               </button>

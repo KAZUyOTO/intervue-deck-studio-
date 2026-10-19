@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { deleteFile, exists, fileUrl, listFiles, putFile, storageReady } from '@/lib/storage';
 import type { LogoAsset } from '@/lib/types';
-import { findWebsiteLogo } from '@/lib/website-logo';
+import { findWebsiteLogo, logoFailure } from '@/lib/website-logo';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -65,7 +65,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ...result, source: found.source });
     } catch (error) {
       console.warn('[logos] Website import failed:', error instanceof Error ? error.message : 'Unknown error');
-      return NextResponse.json({ error: 'Could not find a usable logo. Use a public company homepage, or upload a PNG or SVG instead.' }, { status: 422 });
+      const failure = logoFailure(error);
+      return NextResponse.json({ error: failure.error, code: failure.code }, { status: failure.status });
     }
   }
 
