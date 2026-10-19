@@ -45,9 +45,10 @@ Text that isn't changed stays exactly as Figma rendered it. Edited text is redra
 
 1. Open the link.
 2. Type the client name — it fills in on every slide.
-3. Drag a logo from the library onto any dashed box (or drop an image file straight from your computer onto the box). It's applied to every logo spot in the deck.
-4. Click any text on the slide to edit it.
-5. **Download PDF**. The file is always under 3 MB; edits are saved in your browser until you press **Start over**.
+3. In **Logo library**, paste the company website and click **Find logo**, or upload a logo yourself. The lookup prefers structured logo metadata, then page logo images, then site icons. Sites that block automated requests or expose no usable PNG, SVG, JPG or WebP need a manual upload. Logos are saved and deduplicated using the same library as uploads.
+4. Drag a logo from the library onto any dashed box (or drop an image file straight from your computer onto the box). It's applied to every logo spot in the deck.
+5. Click any text on the slide to edit it.
+6. **Download PDF**. The file is always under 3 MB; edits are saved in your browser until you press **Start over**.
 
 ---
 
@@ -82,3 +83,5 @@ Without a Blob token, files are stored in `.data/`.
 - `lib/figma.ts` reads the file through the Figma REST API, exports each frame as SVG with `data-node-id` on every layer, and records each text layer's position and style plus each `logo-slot`.
 - In the browser (`lib/render.ts`), each slide is drawn from that SVG. Edited layers are removed from the SVG and redrawn on top with the new text; logos are fitted inside their slot.
 - `lib/pdf.ts` renders every slide at 1920 px, then steps JPEG quality / size down until the PDF is under 3 MB.
+
+Logo lookup stays inside the Next.js `/api/logos` route; no API key or separate service is required. Each outbound request validates public IP addresses (including redirects), pins DNS resolution, and uses time and size limits. Run its tests with `node --experimental-strip-types --test tests/website-logo.test.mjs` (Node 22.6+).

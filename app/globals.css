@@ -151,6 +151,12 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: rg
 .logo-img img { max-width: 88%; max-height: 80%; object-fit: contain; }
 .logo-name { font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
 
+.website-logo { margin: 12px 0; }
+.website-logo .field { margin-top: 0; }
+.website-logo .btn { width: 100%; margin-top: 10px; }
+.website-logo .note.error { color: var(--danger); }
+.website-logo [role="status"]:empty { display: none; }
+
 /* modal + toast */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(20, 21, 26, .35); display: grid; place-items: center; z-index: 50; animation: fade .12s ease-out; }
 .modal { width: min(440px, calc(100vw - 32px)); background: #fff; border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 24px 60px rgba(0,0,0,.22); animation: rise .16s ease-out; }

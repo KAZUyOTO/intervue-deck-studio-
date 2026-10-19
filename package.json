@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@vercel/blob": "2.8.2",
+    "cheerio": "^1.2.0",
     "fflate": "0.8.2",
+    "ipaddr.js": "^2.5.0",
     "next": "16.4.1",
     "pdf-lib": "1.17.1",
     "react": "19.3.1",
