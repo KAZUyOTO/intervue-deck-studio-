@@ -35,7 +35,10 @@ async function publishedDecks(): Promise<{ decks: Deck[]; latest: string }> {
     decks.push(deck);
     if ((doc.publishedAt || '') > newest) newest = doc.publishedAt;
   }
-  decks.sort((a, b) => ((b.updatedAt || '') < (a.updatedAt || '') ? -1 : 1));
+  // Numbered decks first in number order (5.1 before 16), then A to Z.
+  const byName = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+  const leadsWithNumber = (n: string) => /^\s*\d/.test(n);
+  decks.sort((a, b) => Number(leadsWithNumber(b.name)) - Number(leadsWithNumber(a.name)) || byName.compare(a.name.trim(), b.name.trim()));
   return { decks, latest: newest };
 }
 

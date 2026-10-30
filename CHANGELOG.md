@@ -2,6 +2,9 @@
 
 What changed in each release of Deck Studio, newest first. Each Vercel deployment's message matches the top entry.
 
+## 2026-10-30 — Deck library sorted by name
+- Decks whose names start with a number come first, in number order (5.1 before 15.1 before 16), then the rest A to Z.
+
 ## 2026-10-19 — Find logo works on more websites (PR #2)
 - Find logo now also reads responsive and lazy-loaded images, inline SVG logos, app manifest icons and compressed pages, and accepts a direct link to a logo image.
 - GIF, AVIF, TIFF and ICO logos are converted to PNG so they work in slides and the PDF.
