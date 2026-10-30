@@ -2,6 +2,10 @@
 
 What changed in each release of Deck Studio, newest first. Each Vercel deployment's message matches the top entry.
 
+## 2026-10-30 — Storage moved to Cloudflare R2
+- Decks, slide images and logos are now stored in Cloudflare R2 (free tier: 10 GB, 1M uploads and 10M reads a month, free downloads) instead of Vercel Blob, whose free plan blocked the store after 2,000 operations.
+- Turned on by adding the R2_* settings in Vercel; without them the app keeps using Vercel Blob.
+
 ## 2026-10-30 — Restore removed decks
 - For designers → "Show removed decks" lists every deck that was removed from the library, with Restore (or Restore all). Needs the designer passcode.
 

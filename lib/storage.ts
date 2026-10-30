@@ -1,16 +1,19 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { put, list as blobList, head, del } from '@vercel/blob';
+import { r2Configured, r2Delete, r2Exists, r2Get, r2List, r2PublicUrl, r2Put } from './r2';
 
 /**
- * One tiny storage API with two backends:
- * - Vercel Blob when BLOB_READ_WRITE_TOKEN is set (production)
+ * One tiny storage API with three backends:
+ * - Cloudflare R2 when the R2_* settings are present (production)
+ * - Vercel Blob when BLOB_READ_WRITE_TOKEN is set (previous production store)
  * - a local .data folder otherwise (local dev)
  */
 
 export type StoredItem = { pathname: string; size: number; uploadedAt: string };
 
-const useBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+const useR2 = r2Configured;
+const useBlob = () => !useR2() && Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const access = () => (process.env.BLOB_ACCESS === 'private' ? 'private' : 'public') as 'public';
 const LOCAL_ROOT = path.join(process.cwd(), '.data');
 
@@ -21,15 +24,16 @@ function safeLocal(pathname: string) {
 }
 
 export function storageReady(): { ok: boolean; reason?: string } {
-  if (useBlob()) return { ok: true };
+  if (useR2() || useBlob()) return { ok: true };
   if (process.env.VERCEL) {
-    return { ok: false, reason: 'Connect a Vercel Blob store to this project to save files.' };
+    return { ok: false, reason: 'Storage is not set up: add the R2_* settings to this Vercel project.' };
   }
   return { ok: true };
 }
 
 /** Saves a file and returns the URL the browser should load it from. */
 export async function putFile(pathname: string, body: Buffer | string, contentType: string): Promise<string> {
+  if (useR2()) return r2Put(pathname, body, contentType);
   if (useBlob()) {
     const res = await put(pathname, body, {
       access: access(),
@@ -46,6 +50,7 @@ export async function putFile(pathname: string, body: Buffer | string, contentTy
 }
 
 export async function exists(pathname: string): Promise<boolean> {
+  if (useR2()) return r2Exists(pathname);
   if (useBlob()) {
     try {
       await head(pathname);
@@ -64,6 +69,7 @@ export async function exists(pathname: string): Promise<boolean> {
 
 /** Deletes a stored file (no error if it's already gone). */
 export async function deleteFile(pathname: string): Promise<void> {
+  if (useR2()) return r2Delete(pathname);
   if (useBlob()) {
     await del(pathname);
     return;
@@ -73,6 +79,7 @@ export async function deleteFile(pathname: string): Promise<void> {
 
 /** Public URL of a stored file in Blob storage (null when running on local files). */
 export async function publicUrl(pathname: string): Promise<string | null> {
+  if (useR2()) return r2PublicUrl(pathname);
   if (!useBlob()) return null;
   try {
     return (await head(pathname)).url;
@@ -82,6 +89,10 @@ export async function publicUrl(pathname: string): Promise<string | null> {
 }
 
 export async function getFile(pathname: string): Promise<{ body: ArrayBuffer; contentType: string } | null> {
+  if (useR2()) {
+    const f = await r2Get(pathname).catch(() => null);
+    return f && { body: f.body, contentType: f.contentType === 'application/octet-stream' ? guessType(pathname) : f.contentType };
+  }
   if (useBlob()) {
     try {
       const meta = await head(pathname);
@@ -106,6 +117,7 @@ export async function getFile(pathname: string): Promise<{ body: ArrayBuffer; co
 }
 
 export async function listFiles(prefix: string): Promise<StoredItem[]> {
+  if (useR2()) return r2List(prefix);
   if (useBlob()) {
     const out: StoredItem[] = [];
     let cursor: string | undefined;
