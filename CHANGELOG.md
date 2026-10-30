@@ -2,6 +2,9 @@
 
 What changed in each release of Deck Studio, newest first. Each Vercel deployment's message matches the top entry.
 
+## 2026-10-30 — Restore removed decks
+- For designers → "Show removed decks" lists every deck that was removed from the library, with Restore (or Restore all). Needs the designer passcode.
+
 ## 2026-10-30 — Deck library sorted by name, with search
 - Decks whose names start with a number come first, in number order (5.1 before 15.1 before 16), then the rest A to Z.
 - Search box at the top of the library: finds decks by any word or part of a word in the deck name or in the text on its slides. When the match is on a slide, the card shows which slide and the line it was found in. Esc clears the search.

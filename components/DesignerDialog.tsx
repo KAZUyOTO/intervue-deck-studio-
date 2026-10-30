@@ -25,6 +25,35 @@ export default function DesignerDialog({
   });
   const [state, setState] = useState<{ busy?: string; error?: string; done?: string }>({});
   const published = manifest.decks.filter((d) => d.id.startsWith('pub:'));
+  type Removed = { slug: string; name: string; slides: number; removedAt: string };
+  const [removed, setRemoved] = useState<Removed[] | null>(null);
+
+  const loadRemoved = async () => {
+    if (adminKeyRequired && !key) return setState({ error: 'Enter the designer passcode first.' });
+    setState({ busy: 'removed' });
+    const res = await fetch('/api/publish/restore', { headers: { 'x-admin-key': key } });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return setState({ error: json.error || 'Could not load removed decks.' });
+    try {
+      localStorage.setItem('deck-studio:admin', key);
+    } catch {}
+    setRemoved(json.decks || []);
+    setState({});
+  };
+
+  const restore = async (slugs: string[]) => {
+    setState({ busy: 'restore' });
+    const res = await fetch('/api/publish/restore', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-admin-key': key },
+      body: JSON.stringify({ slugs }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return setState({ error: json.error || 'Could not restore.' });
+    setRemoved((cur) => (cur || []).filter((d) => !slugs.includes(d.slug)));
+    setState({ done: `Restored ${json.restored.length} ${json.restored.length === 1 ? 'deck' : 'decks'}: ${json.restored.join(', ')}` });
+    onChanged();
+  };
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -93,11 +122,44 @@ export default function DesignerDialog({
                 </div>
               ))}
             </div>
-            {adminKeyRequired && (
-              <label className="field">
-                <span>Designer passcode (needed to remove a deck)</span>
-                <input type="password" value={key} onChange={(e) => setKey(e.target.value)} />
-              </label>
+          </>
+        )}
+
+        {adminKeyRequired && (
+          <label className="field">
+            <span>Designer passcode (needed to remove or restore a deck)</span>
+            <input type="password" value={key} onChange={(e) => setKey(e.target.value)} />
+          </label>
+        )}
+
+        <h3 className="sub">Removed decks</h3>
+        {removed === null ? (
+          <button className="link" onClick={loadRemoved} disabled={!!state.busy}>
+            {state.busy === 'removed' ? 'Loading…' : 'Show removed decks'}
+          </button>
+        ) : removed.length === 0 ? (
+          <p className="hint">No removed decks.</p>
+        ) : (
+          <>
+            <div className="deck-list">
+              {removed.map((d) => (
+                <div key={d.slug} className="deck-row">
+                  <span>
+                    {d.name}{' '}
+                    <em>
+                      · {d.slides} slides{d.removedAt ? ` · removed ${relTime(d.removedAt)}` : ''}
+                    </em>
+                  </span>
+                  <button className="link" onClick={() => restore([d.slug])} disabled={!!state.busy}>
+                    Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+            {removed.length > 1 && (
+              <button className="link" onClick={() => restore(removed.map((d) => d.slug))} disabled={!!state.busy}>
+                {state.busy === 'restore' ? 'Restoring…' : `Restore all ${removed.length}`}
+              </button>
             )}
           </>
         )}
