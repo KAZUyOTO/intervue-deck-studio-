@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Deck, Manifest } from '@/lib/types';
 import { emptyValues, renderSlide } from '@/lib/render';
+import { searchDecks, sortDecks } from '@/lib/decks';
 
 export function relTime(iso?: string) {
   if (!iso) return '';
@@ -40,7 +41,7 @@ export default function Library({
   onDesigner: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const decks = manifest.decks.filter((d) => d.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const matches = searchDecks(sortDecks(manifest.decks), query);
 
   return (
     <div className="library-page">
@@ -64,13 +65,21 @@ export default function Library({
               {manifest.source === 'demo' && ' No decks have been published yet — this is a demo deck.'}
             </p>
           </div>
-          {manifest.decks.length > 6 && (
-            <input className="search lib-search" placeholder="Search decks" value={query} onChange={(e) => setQuery(e.target.value)} />
+          {manifest.decks.length > 1 && (
+            <input
+              type="search"
+              className="search lib-search"
+              placeholder="Search decks by name or slide text"
+              aria-label="Search decks"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+            />
           )}
         </div>
 
         <div className="deck-grid">
-          {decks.map((d) => (
+          {matches.map(({ deck: d, inName, snippet, slide }) => (
             <button key={d.id} className="deck-card" onClick={() => onOpen(d.id)}>
               <Cover deck={d} />
               <span className="deck-card-meta">
@@ -79,10 +88,15 @@ export default function Library({
                   {d.slides.length} {d.slides.length === 1 ? 'slide' : 'slides'}
                   {d.updatedAt ? ` · updated ${relTime(d.updatedAt)}` : ''}
                 </span>
+                {!inName && snippet && (
+                  <span className="deck-card-hit">
+                    Slide {slide}: “{snippet}”
+                  </span>
+                )}
               </span>
             </button>
           ))}
-          {decks.length === 0 && <p className="hint">No decks match “{query}”.</p>}
+          {matches.length === 0 && <p className="hint">No decks match “{query}”.</p>}
         </div>
       </main>
     </div>

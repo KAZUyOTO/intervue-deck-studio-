@@ -205,6 +205,8 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: rg
 .deck-card-meta { display: flex; flex-direction: column; gap: 2px; padding: 0 2px; }
 .deck-card-meta strong { font-size: 14px; font-weight: 600; }
 .deck-card-meta span { font-size: 12.5px; color: var(--ink-3); }
+.deck-card-meta .deck-card-hit { color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lib-search { width: 320px; }
 .btn.back { padding: 0 10px; }
 .thumb img { width: 160px; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line-2); display: block; }
 .thumb.is-active img { box-shadow: 0 0 0 2px var(--accent); }

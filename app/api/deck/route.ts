@@ -3,6 +3,7 @@ import demo from '@/lib/demo-manifest.json';
 import { getFile, listFiles, storageReady } from '@/lib/storage';
 import type { Deck, Manifest } from '@/lib/types';
 import { onSlide } from '@/lib/geometry';
+import { sortDecks } from '@/lib/decks';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,10 +36,6 @@ async function publishedDecks(): Promise<{ decks: Deck[]; latest: string }> {
     decks.push(deck);
     if ((doc.publishedAt || '') > newest) newest = doc.publishedAt;
   }
-  // Numbered decks first in number order (5.1 before 16), then A to Z.
-  const byName = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
-  const leadsWithNumber = (n: string) => /^\s*\d/.test(n);
-  decks.sort((a, b) => Number(leadsWithNumber(b.name)) - Number(leadsWithNumber(a.name)) || byName.compare(a.name.trim(), b.name.trim()));
   return { decks, latest: newest };
 }
 
@@ -49,7 +46,8 @@ export async function GET() {
     const synced = (await listFiles('manifests/')).filter((f) => f.pathname.endsWith('.json'));
     synced.sort((a, b) => (a.pathname < b.pathname ? 1 : -1));
     const api: Manifest | null = synced[0] ? await readJson(synced[0].pathname) : null;
-    const decks = [...pub.decks, ...(api?.decks || [])];
+    // Numbered decks first in number order (5.1 before 16), then A to Z.
+    const decks = sortDecks([...pub.decks, ...(api?.decks || [])]);
     if (decks.length) {
       manifest = {
         version: 1,
