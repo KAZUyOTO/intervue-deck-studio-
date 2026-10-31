@@ -54,6 +54,34 @@ Text that isn't changed stays exactly as Figma rendered it. Edited text is redra
 
 ## Deploying on Vercel
 
+### Supabase storage
+
+The preferred backend is Supabase when `SUPABASE_URL`, `SUPABASE_STORAGE_BUCKET`, and `SUPABASE_STORAGE_GATEWAY_TOKEN` are all configured. Until then the existing Blob/R2 configuration continues to work. Do not enable Supabase in production before the copy and checksum verification finish.
+
+The `deck-studio-storage` Edge Function authenticates the server using a bucket-scoped token (only its SHA-256 hash is committed). Supabase's administrative key stays inside the Edge Function environment and is never sent to Vercel or a browser. Reads, uploads, listing, and deletes are restricted to the `deck-studio` bucket. Public downloads use Supabase's CDN, matching the previous public Blob behavior. The SQL inventory function is executable only by `service_role`.
+
+Migration commands use a gitignored `.env.migration.local` containing the Blob token and Supabase server settings:
+
+```bash
+node --env-file=.env.migration.local scripts/migrate-storage.mjs inventory
+node --env-file=.env.migration.local scripts/migrate-storage.mjs bootstrap
+node --env-file=.env.migration.local scripts/migrate-storage.mjs backup
+node --env-file=.env.migration.local scripts/migrate-storage.mjs copy
+node --env-file=.env.migration.local scripts/migrate-storage.mjs verify
+```
+
+The backup, inventory, and checksum reports stay in gitignored `.migration/`. All original Blob files are retained. JSON documents are copied with old Blob asset addresses replaced by the app's stable `/api/files/` addresses. Original upload dates are preserved in Supabase object metadata. After verification, re-list Blob and compare the inventory to catch any concurrent changes; repeat the copy if needed. Then enable the Supabase variables in Vercel and deploy. To roll back, remove these three variables and redeploy; the Blob store must be readable for rollback to work.
+
+Connection smoke test (creates and deletes one temporary object):
+
+```bash
+node --env-file=.env.migration.local --experimental-strip-types scripts/check-supabase-storage.mjs
+```
+
+The `Supabase storage health` GitHub workflow runs every eight hours and after workflow changes. It calls the JWT-protected `deck-studio-health` function, which performs an actual database query and bucket check. Only the public anon key is used by GitHub. Failures appear as failed workflow runs; GitHub notification delivery follows the repository owner's settings. No paid monitoring service is required. Scheduled GitHub workflows can be delayed, and public-repository schedules are disabled after 60 days without repository activity. Supabase does not guarantee that periodic queries prevent free-plan pausing.
+
+### Original Blob setup
+
 1. Push this folder to a GitHub repo and import it in Vercel (framework: Next.js).
 2. **Storage → Create → Blob**, and connect it to the project. This adds `BLOB_READ_WRITE_TOKEN` (logo library + synced slides live here).
 3. **Settings → Environment Variables**:

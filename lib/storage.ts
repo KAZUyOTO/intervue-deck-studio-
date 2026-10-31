@@ -2,9 +2,11 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { put, list as blobList, head, del } from '@vercel/blob';
 import { r2Configured, r2Delete, r2Exists, r2Get, r2List, r2PublicUrl, r2Put } from './r2';
+import { supabaseConfigured, supabaseDelete, supabaseExists, supabaseGet, supabaseList, supabasePublicUrl, supabasePut } from './supabase-storage';
 
 /**
- * One tiny storage API with three backends:
+ * One storage API, with Supabase preferred when configured:
+ * - Supabase Storage when SUPABASE_* settings are present
  * - Cloudflare R2 when the R2_* settings are present (production)
  * - Vercel Blob when BLOB_READ_WRITE_TOKEN is set (previous production store)
  * - a local .data folder otherwise (local dev)
@@ -12,8 +14,9 @@ import { r2Configured, r2Delete, r2Exists, r2Get, r2List, r2PublicUrl, r2Put } f
 
 export type StoredItem = { pathname: string; size: number; uploadedAt: string };
 
-const useR2 = r2Configured;
-const useBlob = () => !useR2() && Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+const useSupabase = supabaseConfigured;
+const useR2 = () => !useSupabase() && r2Configured();
+const useBlob = () => !useSupabase() && !useR2() && Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const access = () => (process.env.BLOB_ACCESS === 'private' ? 'private' : 'public') as 'public';
 const LOCAL_ROOT = path.join(process.cwd(), '.data');
 
@@ -24,15 +27,16 @@ function safeLocal(pathname: string) {
 }
 
 export function storageReady(): { ok: boolean; reason?: string } {
-  if (useR2() || useBlob()) return { ok: true };
+  if (useSupabase() || useR2() || useBlob()) return { ok: true };
   if (process.env.VERCEL) {
-    return { ok: false, reason: 'Storage is not set up: add the R2_* settings to this Vercel project.' };
+    return { ok: false, reason: 'Storage is not set up: add the Supabase storage settings to this Vercel project.' };
   }
   return { ok: true };
 }
 
 /** Saves a file and returns the URL the browser should load it from. */
 export async function putFile(pathname: string, body: Buffer | string, contentType: string): Promise<string> {
+  if (useSupabase()) return supabasePut(pathname, body, contentType);
   if (useR2()) return r2Put(pathname, body, contentType);
   if (useBlob()) {
     const res = await put(pathname, body, {
@@ -50,6 +54,7 @@ export async function putFile(pathname: string, body: Buffer | string, contentTy
 }
 
 export async function exists(pathname: string): Promise<boolean> {
+  if (useSupabase()) return supabaseExists(pathname);
   if (useR2()) return r2Exists(pathname);
   if (useBlob()) {
     try {
@@ -69,6 +74,7 @@ export async function exists(pathname: string): Promise<boolean> {
 
 /** Deletes a stored file (no error if it's already gone). */
 export async function deleteFile(pathname: string): Promise<void> {
+  if (useSupabase()) return supabaseDelete(pathname);
   if (useR2()) return r2Delete(pathname);
   if (useBlob()) {
     await del(pathname);
@@ -79,6 +85,7 @@ export async function deleteFile(pathname: string): Promise<void> {
 
 /** Public URL of a stored file in Blob storage (null when running on local files). */
 export async function publicUrl(pathname: string): Promise<string | null> {
+  if (useSupabase()) return supabasePublicUrl(pathname);
   if (useR2()) return r2PublicUrl(pathname);
   if (!useBlob()) return null;
   try {
@@ -89,6 +96,7 @@ export async function publicUrl(pathname: string): Promise<string | null> {
 }
 
 export async function getFile(pathname: string): Promise<{ body: ArrayBuffer; contentType: string } | null> {
+  if (useSupabase()) return supabaseGet(pathname);
   if (useR2()) {
     const f = await r2Get(pathname).catch(() => null);
     return f && { body: f.body, contentType: f.contentType === 'application/octet-stream' ? guessType(pathname) : f.contentType };
@@ -117,6 +125,7 @@ export async function getFile(pathname: string): Promise<{ body: ArrayBuffer; co
 }
 
 export async function listFiles(prefix: string): Promise<StoredItem[]> {
+  if (useSupabase()) return supabaseList(prefix);
   if (useR2()) return r2List(prefix);
   if (useBlob()) {
     const out: StoredItem[] = [];

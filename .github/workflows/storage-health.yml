@@ -1,0 +1,28 @@
+name: Supabase storage health
+
+on:
+  schedule:
+    - cron: '23 */8 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/storage-health.yml
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check storage and database availability
+        # This is Supabase's public anon key, not a secret or a service-role key.
+        # The function returns only availability and exposes no bucket contents.
+        env:
+          HEALTH_URL: https://kdsoltktfhlxvcedegyr.supabase.co/functions/v1/deck-studio-health
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtkc29sdGt0ZmhseHZjZWRlZ3lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0MDI0MzYsImV4cCI6MjEwODk3ODQzNn0.84UN-VTQMl5DkxJFCkgV2x3h1vkgLBmpLfhGYUH22qk
+        run: |
+          curl --fail-with-body --silent --show-error --retry 2 --max-time 45 \
+            --header "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$HEALTH_URL"
