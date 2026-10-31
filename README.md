@@ -78,7 +78,7 @@ Connection smoke test (creates and deletes one temporary object):
 node --env-file=.env.migration.local --experimental-strip-types scripts/check-supabase-storage.mjs
 ```
 
-The `Supabase storage health` GitHub workflow runs every eight hours and after workflow changes. It calls the JWT-protected `deck-studio-health` function, which performs an actual database query and bucket check. Only the public anon key is used by GitHub. Failures appear as failed workflow runs; GitHub notification delivery follows the repository owner's settings. No paid monitoring service is required. Scheduled GitHub workflows can be delayed, and public-repository schedules are disabled after 60 days without repository activity. Supabase does not guarantee that periodic queries prevent free-plan pausing.
+UptimeRobot monitors the `deck-studio-monitor` Edge Function using its free five-minute checks. The function handles GET and HEAD, performs a real database query and bucket check, and returns only availability. Its separate URL credential cannot access files or change settings; keep the full monitor URL outside the repository. Downtime/recovery alerts go to the owner's UptimeRobot email. The GitHub health-check schedule has been removed after confirming a successful UptimeRobot request. No paid monitoring service is required. Supabase does not guarantee that periodic queries prevent free-plan pausing.
 
 ### Original Blob setup
 
